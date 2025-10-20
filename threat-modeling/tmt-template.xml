@@ -1,0 +1,284 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ThreatModel>
+  <DrawingSurface>
+    <DrawingSurfaceElements>
+      <!-- External Actors -->
+      <DrawingSurfaceElement id="user" type="Actor" x="80" y="200" width="30" height="60">
+        <Name>Identity Holder</Name>
+        <Description>User who owns and manages their decentralized identity</Description>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="issuer" type="Actor" x="80" y="400" width="30" height="60">
+        <Name>Issuer</Name>
+        <Description>Organization that issues credentials (universities, employers)</Description>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="verifier" type="Actor" x="80" y="600" width="30" height="60">
+        <Name>Verifier</Name>
+        <Description>Service provider that verifies credentials</Description>
+      </DrawingSurfaceElement>
+      
+      <!-- Frontend Application -->
+      <DrawingSurfaceElement id="frontend" type="Process" x="200" y="300" width="150" height="100">
+        <Name>React Frontend Application</Name>
+        <Description>User interface for identity management, credential issuance, and verification</Description>
+        <TrustBoundary>Internet</TrustBoundary>
+      </DrawingSurfaceElement>
+      
+      <!-- Backend API -->
+      <DrawingSurfaceElement id="backend" type="Process" x="400" y="300" width="150" height="100">
+        <Name>Express.js Backend API</Name>
+        <Description>REST API server handling business logic and blockchain integration</Description>
+        <TrustBoundary>Application</TrustBoundary>
+      </DrawingSurfaceElement>
+      
+      <!-- Blockchain Network -->
+      <DrawingSurfaceElement id="blockchain" type="Process" x="600" y="200" width="150" height="100">
+        <Name>Ethereum Blockchain Network</Name>
+        <Description>Smart contracts for identity registry, credential management, and verification</Description>
+        <TrustBoundary>Blockchain</TrustBoundary>
+      </DrawingSurfaceElement>
+      
+      <!-- IPFS Network -->
+      <DrawingSurfaceElement id="ipfs" type="Process" x="600" y="400" width="150" height="100">
+        <Name>IPFS Network</Name>
+        <Description>Decentralized storage for credential documents and DID documents</Description>
+        <TrustBoundary>Storage</TrustBoundary>
+      </DrawingSurfaceElement>
+      
+      <!-- Zero-Knowledge Proof System -->
+      <DrawingSurfaceElement id="zkp" type="Process" x="400" y="500" width="150" height="100">
+        <Name>Zero-Knowledge Proof System</Name>
+        <Description>ZoKrates circuits for privacy-preserving verification</Description>
+        <TrustBoundary>Application</TrustBoundary>
+      </DrawingSurfaceElement>
+      
+      <!-- Database -->
+      <DrawingSurfaceElement id="database" type="DataStore" x="200" y="500" width="150" height="80">
+        <Name>MongoDB Database</Name>
+        <Description>Off-chain metadata, session management, and caching</Description>
+        <TrustBoundary>Application</TrustBoundary>
+      </DrawingSurfaceElement>
+      
+      <!-- Data Stores -->
+      <DrawingSurfaceElement id="private-keys" type="DataStore" x="50" y="100" width="100" height="60">
+        <Name>Private Keys</Name>
+        <Description>User private keys stored in MetaMask or hardware wallets</Description>
+        <TrustBoundary>User</TrustBoundary>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="credential-data" type="DataStore" x="800" y="100" width="100" height="60">
+        <Name>Credential Data</Name>
+        <Description>Encrypted credential information stored in IPFS</Description>
+        <TrustBoundary>Storage</TrustBoundary>
+      </DrawingSurfaceElement>
+      
+    </DrawingSurfaceElements>
+    
+    <!-- Data Flows -->
+    <DrawingSurfaceElements>
+      <DrawingSurfaceElement id="flow1" type="DataFlow" from="user" to="frontend">
+        <Name>HTTPS/Web3</Name>
+        <Description>User interaction with web interface and MetaMask integration</Description>
+        <Data>User credentials, transaction requests, verification requests</Data>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="flow2" type="DataFlow" from="issuer" to="frontend">
+        <Name>HTTPS</Name>
+        <Description>Issuer access to credential issuance interface</Description>
+        <Data>Issuer credentials, credential data, issuance requests</Data>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="flow3" type="DataFlow" from="verifier" to="frontend">
+        <Name>HTTPS</Name>
+        <Description>Verifier access to verification interface</Description>
+        <Data>Verification requests, proof data, verification results</Data>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="flow4" type="DataFlow" from="frontend" to="backend">
+        <Name>REST API/JSON</Name>
+        <Description>Frontend API calls to backend services</Description>
+        <Data>API requests, user data, credential data, verification requests</Data>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="flow5" type="DataFlow" from="backend" to="blockchain">
+        <Name>Web3/JSON-RPC</Name>
+        <Description>Backend interaction with blockchain smart contracts</Description>
+        <Data>Transaction data, smart contract calls, blockchain queries</Data>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="flow6" type="DataFlow" from="backend" to="ipfs">
+        <Name>IPFS API/HTTP</Name>
+        <Description>Backend storage and retrieval of documents from IPFS</Description>
+        <Data>Document data, metadata, encrypted content</Data>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="flow7" type="DataFlow" from="backend" to="zkp">
+        <Name>Proof Generation</Name>
+        <Description>Backend requests for zero-knowledge proof generation</Description>
+        <Data>Proof parameters, private inputs, public inputs</Data>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="flow8" type="DataFlow" from="backend" to="database">
+        <Name>MongoDB Protocol</Name>
+        <Description>Backend database operations for metadata and caching</Description>
+        <Data>Metadata, session data, cached information</Data>
+      </DrawingSurfaceElement>
+      
+    </DrawingSurfaceElements>
+    
+    <!-- Trust Boundaries -->
+    <DrawingSurfaceElements>
+      <DrawingSurfaceElement id="trust-boundary-1" type="TrustBoundary" x="70" y="180" width="300" height="200">
+        <Name>Internet Trust Boundary</Name>
+        <Description>External network and user devices</Description>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="trust-boundary-2" type="TrustBoundary" x="180" y="280" width="200" height="140">
+        <Name>Application Trust Boundary</Name>
+        <Description>Internal application components</Description>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="trust-boundary-3" type="TrustBoundary" x="580" y="180" width="180" height="340">
+        <Name>Blockchain Trust Boundary</Name>
+        <Description>Blockchain network and smart contracts</Description>
+      </DrawingSurfaceElement>
+      
+      <DrawingSurfaceElement id="trust-boundary-4" type="TrustBoundary" x="580" y="380" width="180" height="140">
+        <Name>Storage Trust Boundary</Name>
+        <Description>Decentralized storage systems</Description>
+      </DrawingSurfaceElement>
+      
+    </DrawingSurfaceElements>
+  </DrawingSurface>
+  
+  <!-- Threats -->
+  <Threats>
+    <!-- Spoofing Threats -->
+    <Threat id="T1" category="Spoofing" title="Identity Spoofing">
+      <Description>Attacker impersonates a legitimate user to gain unauthorized access to the system</Description>
+      <Impact>High - Complete identity takeover and unauthorized access to user data</Impact>
+      <Likelihood>High - Common attack vector through phishing and social engineering</Likelihood>
+      <Mitigation>Multi-factor authentication, hardware wallet integration, user education</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <Threat id="T2" category="Spoofing" title="Issuer Spoofing">
+      <Description>Malicious actor creates fake credentials by impersonating legitimate issuers</Description>
+      <Impact>High - Credential fraud and trust system compromise</Impact>
+      <Likelihood>Medium - Requires issuer verification and registration</Likelihood>
+      <Mitigation>Issuer verification system, reputation mechanisms, regular audits</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <!-- Tampering Threats -->
+    <Threat id="T3" category="Tampering" title="Smart Contract Tampering">
+      <Description>Unauthorized modification of smart contract logic or state</Description>
+      <Impact>Critical - Complete system compromise</Impact>
+      <Likelihood>Low - Immutable nature of deployed contracts</Likelihood>
+      <Mitigation>Immutable deployment, multi-signature requirements, formal verification</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <Threat id="T4" category="Tampering" title="Data Tampering">
+      <Description>Unauthorized modification of credential or identity data</Description>
+      <Impact>High - Data integrity loss and trust compromise</Impact>
+      <Likelihood>Medium - Cryptographic protections in place</Likelihood>
+      <Mitigation>Cryptographic hashing, digital signatures, data validation</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <!-- Repudiation Threats -->
+    <Threat id="T5" category="Repudiation" title="Transaction Repudiation">
+      <Description>Users deny performing blockchain transactions or system operations</Description>
+      <Impact>Medium - Accountability and audit trail issues</Impact>
+      <Likelihood>Medium - Immutable blockchain records provide evidence</Likelihood>
+      <Mitigation>Immutable blockchain records, transaction logging, user consent</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <!-- Information Disclosure Threats -->
+    <Threat id="T6" category="Information Disclosure" title="Private Key Exposure">
+      <Description>Unauthorized access to user private keys leading to identity compromise</Description>
+      <Impact>Critical - Complete identity takeover</Impact>
+      <Likelihood>High - Common through malware and phishing</Likelihood>
+      <Mitigation>Hardware wallet integration, secure key storage, user education</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <Threat id="T7" category="Information Disclosure" title="Credential Data Leakage">
+      <Description>Unauthorized access to credential information and personal data</Description>
+      <Impact>High - Privacy violation and data exposure</Impact>
+      <Likelihood>Medium - Encryption and access controls in place</Likelihood>
+      <Mitigation>End-to-end encryption, access controls, data minimization</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <!-- Denial of Service Threats -->
+    <Threat id="T8" category="Denial of Service" title="Blockchain Network DoS">
+      <Description>Disruption of blockchain network operations affecting system availability</Description>
+      <Impact>High - System unavailability and service disruption</Impact>
+      <Likelihood>Low - Network resilience and distributed nature</Likelihood>
+      <Mitigation>Multiple network support, gas optimization, monitoring</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <Threat id="T9" category="Denial of Service" title="API DoS">
+      <Description>Overwhelming the backend API with requests causing service disruption</Description>
+      <Impact>Medium - Service unavailability for legitimate users</Impact>
+      <Likelihood>Medium - Common attack vector</Likelihood>
+      <Mitigation>Rate limiting, load balancing, caching, auto-scaling</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+    <!-- Elevation of Privilege Threats -->
+    <Threat id="T10" category="Elevation of Privilege" title="Admin Privilege Escalation">
+      <Description>Unauthorized elevation to administrative privileges in the system</Description>
+      <Impact>Critical - Complete system compromise</Impact>
+      <Likelihood>Low - Strong access controls and monitoring</Likelihood>
+      <Mitigation>Principle of least privilege, MFA, regular access reviews</Mitigation>
+      <Status>Mitigated</Status>
+    </Threat>
+    
+  </Threats>
+  
+  <!-- Mitigations -->
+  <Mitigations>
+    <Mitigation id="M1" title="Multi-Factor Authentication">
+      <Description>Implement multi-factor authentication using MetaMask and hardware wallets</Description>
+      <Implementation>MetaMask integration with hardware wallet support</Implementation>
+      <Effectiveness>High - Significantly reduces identity spoofing risk</Effectiveness>
+      <Status>Implemented</Status>
+    </Mitigation>
+    
+    <Mitigation id="M2" title="Smart Contract Security">
+      <Description>Implement comprehensive smart contract security measures</Description>
+      <Implementation>OpenZeppelin contracts, formal verification, security audits</Implementation>
+      <Effectiveness>High - Prevents contract tampering and vulnerabilities</Effectiveness>
+      <Status>Implemented</Status>
+    </Mitigation>
+    
+    <Mitigation id="M3" title="End-to-End Encryption">
+      <Description>Encrypt all sensitive data in transit and at rest</Description>
+      <Implementation>AES-256 encryption, TLS 1.3, database encryption</Implementation>
+      <Effectiveness>High - Protects against data leakage and tampering</Effectiveness>
+      <Status>Implemented</Status>
+    </Mitigation>
+    
+    <Mitigation id="M4" title="Zero-Knowledge Proofs">
+      <Description>Implement zero-knowledge proofs for privacy-preserving verification</Description>
+      <Implementation>ZoKrates circuits, proof generation, verification</Implementation>
+      <Effectiveness>High - Enables verification without data exposure</Effectiveness>
+      <Status>Implemented</Status>
+    </Mitigation>
+    
+    <Mitigation id="M5" title="Rate Limiting and DoS Protection">
+      <Description>Implement rate limiting and DoS protection mechanisms</Description>
+      <Implementation>Express rate limiting, load balancing, monitoring</Implementation>
+      <Effectiveness>Medium - Reduces DoS attack impact</Effectiveness>
+      <Status>Implemented</Status>
+    </Mitigation>
+    
+  </Mitigations>
+  
+</ThreatModel>

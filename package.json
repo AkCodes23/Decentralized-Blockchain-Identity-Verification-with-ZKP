@@ -1,0 +1,30 @@
+{
+  "name": "blockchain-identity-system",
+  "version": "1.0.0",
+  "description": "Blockchain-Based Decentralized Identity & Credential Verification System with Zero-Knowledge Privacy",
+  "main": "index.js",
+  "scripts": {
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm start",
+    "contracts:compile": "cd contracts && npx hardhat compile",
+    "contracts:deploy": "cd contracts && npx hardhat run scripts/deploy.js --network localhost",
+    "contracts:test": "cd contracts && npx hardhat test",
+    "setup": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../contracts && npm install"
+  },
+  "keywords": [
+    "blockchain",
+    "identity",
+    "credentials",
+    "zero-knowledge",
+    "ethereum"
+  ],
+  "author": "Academic Project",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "axios": "^1.12.2"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "did": "did:example:alice-demo-001",
+  "publicKeys": [
+    "0xF39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
+  ],
+  "services": [
+    "https://identity.example.com/profile/alice"
+  ],
+  "metadata": {
+    "name": "Alice Johnson",
+    "email": "alice@example.com",
+    "note": "Demo DID for testing"
+  }
+}

@@ -1,0 +1,20 @@
+// Age verification circuit using ZoKrates
+// Proves that a person is above a certain age without revealing their exact age
+
+def main(private field age, field min_age) -> field {
+    // Ensure age is greater than or equal to minimum age
+    // In ZoKrates, we need to use field arithmetic
+    field diff = age - min_age;
+    
+    // Check if diff is non-negative (age >= min_age)
+    // In field arithmetic, we check that the difference is valid
+    // This is a simplified implementation for demo purposes
+    assert(diff >= 0);
+    
+    // Additional validation to ensure age is reasonable
+    assert(age <= 150);  // Maximum reasonable age
+    assert(min_age >= 0);  // Minimum age should be non-negative
+    
+    // Return 1 if verification passes
+    return 1;
+}

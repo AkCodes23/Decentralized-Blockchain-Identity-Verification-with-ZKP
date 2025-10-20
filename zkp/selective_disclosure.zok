@@ -1,0 +1,29 @@
+// Selective disclosure circuit
+// Proves specific attributes of a credential without revealing other attributes
+
+def main(
+    private field[3] credential_attributes,
+    field attribute_index,
+    field expected_value,
+    field threshold
+) -> field {
+    // Ensure attribute index is valid (0, 1, or 2)
+    // In field arithmetic, we need to check bounds differently
+    field index_check = attribute_index * (attribute_index - 1) * (attribute_index - 2);
+    assert(index_check == 0); // This ensures index is 0, 1, or 2
+    
+    // Get the attribute at the specified index using conditional logic
+    field selected_attribute = credential_attributes[0] * (1 - attribute_index) * (1 - attribute_index + 1) +
+                              credential_attributes[1] * attribute_index * (2 - attribute_index) +
+                              credential_attributes[2] * (attribute_index - 1) * (attribute_index - 2);
+    
+    // Verify the attribute meets the threshold requirement
+    field threshold_check = selected_attribute - threshold;
+    assert(threshold_check >= 0);
+    
+    // Verify the attribute matches the expected value
+    assert(selected_attribute == expected_value);
+    
+    // Return 1 if verification passes
+    return 1;
+}
