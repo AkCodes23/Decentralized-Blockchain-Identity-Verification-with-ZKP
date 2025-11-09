@@ -1,11 +1,14 @@
+// src/App.jsx
 import React, { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 import './index.css';
+
 import WalletConnect from './components/WalletConnect';
 import IdentityDashboard from './components/IdentityDashboard';
 import CredentialManager from './components/CredentialManager';
 import VerificationPortal from './components/VerificationPortal';
 import SystemStatus from './components/SystemStatus';
+import DIDPanel from './components/DIDPanel'; // ✅ Added your DID UI
 
 function App() {
   const [account, setAccount] = useState(null);
@@ -13,20 +16,19 @@ function App() {
   const [signer, setSigner] = useState(null);
   const [activeTab, setActiveTab] = useState('identity');
 
+  // Check MetaMask connection on load
   useEffect(() => {
-    // Check if MetaMask is installed
     if (typeof window.ethereum !== 'undefined') {
-      // Check if user is already connected
-      window.ethereum.request({ method: 'eth_accounts' })
+      window.ethereum
+        .request({ method: 'eth_accounts' })
         .then(accounts => {
-          if (accounts.length > 0) {
-            connectWallet();
-          }
+          if (accounts.length > 0) connectWallet();
         })
         .catch(console.error);
     }
   }, []);
 
+  // Connect to MetaMask
   const connectWallet = async () => {
     try {
       if (typeof window.ethereum === 'undefined') {
@@ -35,30 +37,38 @@ function App() {
       }
 
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await provider.send("eth_requestAccounts", []);
+      const accounts = await provider.send('eth_requestAccounts', []);
       const signer = await provider.getSigner();
-      
+
       setProvider(provider);
       setSigner(signer);
       setAccount(accounts[0]);
-      
-      console.log('Connected to MetaMask:', accounts[0]);
+
+      console.log('✅ Connected to MetaMask:', accounts[0]);
     } catch (error) {
       console.error('Error connecting to wallet:', error);
       alert('Failed to connect to MetaMask');
     }
   };
 
+  // Disconnect wallet
   const disconnectWallet = () => {
     setAccount(null);
     setProvider(null);
     setSigner(null);
   };
 
+  // Render tab content
   const renderTabContent = () => {
     switch (activeTab) {
       case 'identity':
-        return <IdentityDashboard account={account} provider={provider} signer={signer} />;
+        return (
+          <div>
+            <IdentityDashboard account={account} provider={provider} signer={signer} />
+            <hr style={{ margin: '30px 0' }} />
+            <DIDPanel signer={signer} /> {/* ✅ Add DID Panel inside Identity tab */}
+          </div>
+        );
       case 'credentials':
         return <CredentialManager account={account} provider={provider} signer={signer} />;
       case 'verification':
@@ -70,6 +80,7 @@ function App() {
 
   return (
     <div className="App">
+      {/* Top Navigation Bar */}
       <nav className="navbar">
         <div className="container">
           <h1>Blockchain Identity System</h1>
@@ -92,27 +103,29 @@ function App() {
         </div>
       </nav>
 
+      {/* Main Page */}
       <div className="container">
         <SystemStatus />
         {!account ? (
           <WalletConnect onConnect={connectWallet} />
         ) : (
           <>
+            {/* Tabs */}
             <div className="tab-container">
               <div className="tabs">
-                <button 
+                <button
                   className={`tab ${activeTab === 'identity' ? 'active' : ''}`}
                   onClick={() => setActiveTab('identity')}
                 >
                   Identity
                 </button>
-                <button 
+                <button
                   className={`tab ${activeTab === 'credentials' ? 'active' : ''}`}
                   onClick={() => setActiveTab('credentials')}
                 >
                   Credentials
                 </button>
-                <button 
+                <button
                   className={`tab ${activeTab === 'verification' ? 'active' : ''}`}
                   onClick={() => setActiveTab('verification')}
                 >
@@ -121,9 +134,8 @@ function App() {
               </div>
             </div>
 
-            <div className="tab-content">
-              {renderTabContent()}
-            </div>
+            {/* Tab Content */}
+            <div className="tab-content">{renderTabContent()}</div>
           </>
         )}
       </div>
