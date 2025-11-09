@@ -1,165 +1,103 @@
+// frontend/src/components/IdentityDashboard.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../api/client';
 
-const IdentityDashboard = ({ account, provider, signer }) => {
+const IdentityDashboard = ({ account }) => {
   const [did, setDid] = useState(null);
   const [didDocument, setDidDocument] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false); // for deactivate/reactivate buttons
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [formData, setFormData] = useState({
-    did: '',
-    publicKeys: [''],
-    services: ['']
-  });
+
+  const loadDIDDocument = useCallback(async (didValue) => {
+    try {
+      const response = await api.get(`/api/identity/${didValue}`);
+      if (response.data?.success) {
+        setDidDocument(response.data);
+      } else {
+        setDidDocument(null);
+      }
+    } catch (err) {
+      console.error('Error loading DID document:', err);
+      setDidDocument(null);
+    }
+  }, []);
 
   const loadIdentity = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.get(`/api/identity/address/${account}`);
-      if (response.data.success) {
-        setDid(response.data.did);
-        loadDIDDocument(response.data.did);
-      }
-    } catch (error) {
-      console.error('Error loading identity:', error);
-      // Identity doesn't exist yet
-    } finally {
-      setLoading(false);
-    }
-  }, [account]);
-
-  useEffect(() => {
-    if (account) {
-      loadIdentity();
-    }
-  }, [account, loadIdentity]);
-
-  const loadDIDDocument = async (did) => {
-    try {
-      const response = await api.get(`/api/identity/${did}`);
-      if (response.data.success) {
-        setDidDocument(response.data);
-      }
-    } catch (error) {
-      console.error('Error loading DID document:', error);
-    }
-  };
-
-  const generateDID = () => {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 15);
-    return `did:example:${timestamp}${random}`;
-  };
-
-  const handleCreateDID = async (e) => {
-    e.preventDefault();
+    if (!account) return;
     try {
       setLoading(true);
       setError(null);
+      setSuccess(null);
 
-      const didToCreate = formData.did || generateDID();
-      
-      const response = await api.post(`/api/identity/create`, {
-        did: didToCreate,
-        publicKeys: formData.publicKeys.filter(key => key.trim() !== ''),
-        services: formData.services.filter(service => service.trim() !== ''),
-        metadata: {
-          createdBy: account,
-          createdAt: new Date().toISOString()
-        }
-      });
-
-      if (response.data.success) {
+      const response = await api.get(`/api/identity/address/${account}`);
+      if (response.data?.success && response.data.did) {
         setDid(response.data.did);
-        setDidDocument(response.data.didDocument);
-        setSuccess('DID created successfully!');
-        setShowCreateForm(false);
-        setFormData({ did: '', publicKeys: [''], services: [''] });
+        await loadDIDDocument(response.data.did);
+      } else {
+        // No DID for this account
+        setDid(null);
+        setDidDocument(null);
       }
-    } catch (error) {
-      console.error('Error creating DID:', error);
-      setError(error.response?.data?.error || 'Failed to create DID');
+    } catch (err) {
+      console.error('Error loading identity:', err);
+      setDid(null);
+      setDidDocument(null);
     } finally {
       setLoading(false);
     }
-  };
+  }, [account, loadDIDDocument]);
+
+  useEffect(() => {
+    loadIdentity();
+  }, [loadIdentity]);
 
   const handleDeactivateDID = async () => {
-    if (!window.confirm('Are you sure you want to deactivate this DID?')) {
-      return;
-    }
+    if (!did) return;
+    if (!window.confirm('Are you sure you want to deactivate this DID?')) return;
 
     try {
-      setLoading(true);
+      setBusy(true);
+      setError(null);
+      setSuccess(null);
+
       const response = await api.post(`/api/identity/${did}/deactivate`);
-      if (response.data.success) {
+      if (response.data?.success) {
         setSuccess('DID deactivated successfully!');
-        loadDIDDocument(did);
+        await loadDIDDocument(did);
+      } else {
+        setError(response.data?.error || 'Failed to deactivate DID');
       }
-    } catch (error) {
-      console.error('Error deactivating DID:', error);
-      setError(error.response?.data?.error || 'Failed to deactivate DID');
+    } catch (err) {
+      console.error('Error deactivating DID:', err);
+      setError(err.response?.data?.error || 'Failed to deactivate DID');
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
 
   const handleReactivateDID = async () => {
+    if (!did) return;
+
     try {
-      setLoading(true);
+      setBusy(true);
+      setError(null);
+      setSuccess(null);
+
       const response = await api.post(`/api/identity/${did}/reactivate`);
-      if (response.data.success) {
+      if (response.data?.success) {
         setSuccess('DID reactivated successfully!');
-        loadDIDDocument(did);
+        await loadDIDDocument(did);
+      } else {
+        setError(response.data?.error || 'Failed to reactivate DID');
       }
-    } catch (error) {
-      console.error('Error reactivating DID:', error);
-      setError(error.response?.data?.error || 'Failed to reactivate DID');
+    } catch (err) {
+      console.error('Error reactivating DID:', err);
+      setError(err.response?.data?.error || 'Failed to reactivate DID');
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
-
-  const addPublicKey = () => {
-    setFormData({
-      ...formData,
-      publicKeys: [...formData.publicKeys, '']
-    });
-  };
-
-  const removePublicKey = (index) => {
-    setFormData({
-      ...formData,
-      publicKeys: formData.publicKeys.filter((_, i) => i !== index)
-    });
-  };
-
-  const updatePublicKey = (index, value) => {
-    const newPublicKeys = [...formData.publicKeys];
-    newPublicKeys[index] = value;
-    setFormData({ ...formData, publicKeys: newPublicKeys });
-  };
-
-  const addService = () => {
-    setFormData({
-      ...formData,
-      services: [...formData.services, '']
-    });
-  };
-
-  const removeService = (index) => {
-    setFormData({
-      ...formData,
-      services: formData.services.filter((_, i) => i !== index)
-    });
-  };
-
-  const updateService = (index, value) => {
-    const newServices = [...formData.services];
-    newServices[index] = value;
-    setFormData({ ...formData, services: newServices });
   };
 
   if (loading) {
@@ -173,123 +111,56 @@ const IdentityDashboard = ({ account, provider, signer }) => {
 
   return (
     <div>
-      {error && <div className="error">{error}</div>}
-      {success && <div className="success">{success}</div>}
+      {error && <div className="error" style={{ marginBottom: 12 }}>{error}</div>}
+      {success && <div className="success" style={{ marginBottom: 12 }}>{success}</div>}
 
       {!did ? (
         <div className="card">
-          <h2>Create Your Decentralized Identity</h2>
-          <p>You don't have a DID yet. Create one to start using the system.</p>
-          
-          {!showCreateForm ? (
-            <button className="btn" onClick={() => setShowCreateForm(true)}>
-              Create DID
-            </button>
-          ) : (
-            <form onSubmit={handleCreateDID}>
-              <div className="form-group">
-                <label>DID (leave empty for auto-generation):</label>
-                <input
-                  type="text"
-                  value={formData.did}
-                  onChange={(e) => setFormData({ ...formData, did: e.target.value })}
-                  placeholder="did:example:your-identifier"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Public Keys:</label>
-                {formData.publicKeys.map((key, index) => (
-                  <div key={index} style={{ display: 'flex', marginBottom: '10px' }}>
-                    <input
-                      type="text"
-                      value={key}
-                      onChange={(e) => updatePublicKey(index, e.target.value)}
-                      placeholder="Enter public key"
-                      style={{ flex: 1, marginRight: '10px' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      onClick={() => removePublicKey(index)}
-                      disabled={formData.publicKeys.length === 1}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className="btn" onClick={addPublicKey}>
-                  Add Public Key
-                </button>
-              </div>
-
-              <div className="form-group">
-                <label>Services:</label>
-                {formData.services.map((service, index) => (
-                  <div key={index} style={{ display: 'flex', marginBottom: '10px' }}>
-                    <input
-                      type="text"
-                      value={service}
-                      onChange={(e) => updateService(index, e.target.value)}
-                      placeholder="Enter service endpoint"
-                      style={{ flex: 1, marginRight: '10px' }}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-danger"
-                      onClick={() => removeService(index)}
-                      disabled={formData.services.length === 1}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                <button type="button" className="btn" onClick={addService}>
-                  Add Service
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button type="submit" className="btn btn-success" disabled={loading}>
-                  {loading ? 'Creating...' : 'Create DID'}
-                </button>
-                <button type="button" className="btn" onClick={() => setShowCreateForm(false)}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
+          <h2>Identity Overview</h2>
+          <p>No DID found for this account.</p>
+          <p style={{ marginTop: 8 }}>
+            Use the <strong>DID Panel</strong> below to create a new DID.
+          </p>
         </div>
       ) : (
         <div className="grid">
           <div className="card">
             <h2>Your Identity</h2>
-            <div style={{ marginBottom: '15px' }}>
+            <div style={{ marginBottom: 10 }}>
               <strong>DID:</strong> {did}
             </div>
-            <div style={{ marginBottom: '15px' }}>
-              <strong>Status:</strong> 
+            <div style={{ marginBottom: 10 }}>
+              <strong>Status:</strong>{' '}
               <span className={`status-badge ${didDocument?.isActive ? 'status-active' : 'status-inactive'}`}>
                 {didDocument?.isActive ? 'Active' : 'Inactive'}
               </span>
             </div>
-            <div style={{ marginBottom: '15px' }}>
+            <div style={{ marginBottom: 10 }}>
               <strong>Owner:</strong> {account}
             </div>
             {didDocument?.createdAt && (
-              <div style={{ marginBottom: '15px' }}>
-                <strong>Created:</strong> {new Date(didDocument.createdAt).toLocaleString()}
+              <div style={{ marginBottom: 10 }}>
+                <strong>Created:</strong>{' '}
+                {new Date(didDocument.createdAt).toLocaleString()}
               </div>
             )}
 
-            <div style={{ marginTop: '20px' }}>
+            <div style={{ marginTop: 16 }}>
               {didDocument?.isActive ? (
-                <button className="btn btn-danger" onClick={handleDeactivateDID} disabled={loading}>
-                  Deactivate DID
+                <button
+                  className="btn btn-danger"
+                  onClick={handleDeactivateDID}
+                  disabled={busy}
+                >
+                  {busy ? 'Working…' : 'Deactivate DID'}
                 </button>
               ) : (
-                <button className="btn btn-success" onClick={handleReactivateDID} disabled={loading}>
-                  Reactivate DID
+                <button
+                  className="btn btn-success"
+                  onClick={handleReactivateDID}
+                  disabled={busy}
+                >
+                  {busy ? 'Working…' : 'Reactivate DID'}
                 </button>
               )}
             </div>
@@ -299,32 +170,40 @@ const IdentityDashboard = ({ account, provider, signer }) => {
             <h3>DID Document</h3>
             {didDocument ? (
               <div>
-                <h4>Public Keys:</h4>
-                <ul>
-                  {didDocument.didDocument?.publicKey?.map((key, index) => (
-                    <li key={index}>
-                      <strong>{key.id}:</strong> {key.publicKeyHex}
-                    </li>
-                  ))}
-                </ul>
+                {Array.isArray(didDocument.didDocument?.publicKey) && (
+                  <>
+                    <h4>Public Keys:</h4>
+                    <ul>
+                      {didDocument.didDocument.publicKey.map((key, idx) => (
+                        <li key={idx}>
+                          <strong>{key.id}:</strong> {key.publicKeyHex}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
-                <h4>Services:</h4>
-                <ul>
-                  {didDocument.didDocument?.service?.map((service, index) => (
-                    <li key={index}>
-                      <strong>{service.type}:</strong> {service.serviceEndpoint}
-                    </li>
-                  ))}
-                </ul>
+                {Array.isArray(didDocument.didDocument?.service) && (
+                  <>
+                    <h4>Services:</h4>
+                    <ul>
+                      {didDocument.didDocument.service.map((svc, idx) => (
+                        <li key={idx}>
+                          <strong>{svc.type}:</strong> {svc.serviceEndpoint}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
 
                 <h4>Raw Document:</h4>
-                <pre style={{ 
-                  backgroundColor: '#f8f9fa', 
-                  padding: '10px', 
-                  borderRadius: '4px',
-                  fontSize: '12px',
+                <pre style={{
+                  backgroundColor: '#f8f9fa',
+                  padding: 10,
+                  borderRadius: 4,
+                  fontSize: 12,
                   overflow: 'auto',
-                  maxHeight: '200px'
+                  maxHeight: 220
                 }}>
                   {JSON.stringify(didDocument.didDocument, null, 2)}
                 </pre>

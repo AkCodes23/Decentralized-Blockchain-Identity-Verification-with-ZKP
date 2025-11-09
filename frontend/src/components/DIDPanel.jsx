@@ -1,127 +1,160 @@
 // frontend/src/components/DIDPanel.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { loadAddresses } from "../lib/addresses";
 import useWeb3 from "../hooks/useWeb3";
 
-const IDENTITY_REGISTRY = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-// Extended ABI
 const ABI = [
   {
-    "inputs":[
-      {"name":"did","type":"string"},
-      {"name":"documentHash","type":"string"},
-      {"name":"publicKeys","type":"string[]"},
-      {"name":"services","type":"string[]"}
+    "inputs": [
+      { "name": "did", "type": "string" },
+      { "name": "documentHash", "type": "string" },
+      { "name": "publicKeys", "type": "string[]" },
+      { "name": "services", "type": "string[]" }
     ],
-    "name":"createDID","outputs":[],"stateMutability":"nonpayable","type":"function"
+    "name": "createDID",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
   },
   {
-    "inputs":[],"name":"getTotalDIDs",
-    "outputs":[{"internalType":"uint256","name":"","type":"uint256"}],
-    "stateMutability":"view","type":"function"
+    "inputs": [],
+    "name": "getTotalDIDs",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
   },
   {
-    "inputs":[{"name":"did","type":"string"}],
-    "name":"doesDIDExist",
-    "outputs":[{"internalType":"bool","name":"","type":"bool"}],
-    "stateMutability":"view","type":"function"
+    "inputs": [{ "name": "addr", "type": "address" }],
+    "name": "getDIDByAddress",
+    "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
+    "stateMutability": "view",
+    "type": "function"
   }
 ];
 
 export default function DIDPanel() {
   const { connect, account, signer, ready, error } = useWeb3();
-  const [did, setDid] = useState("did:example:aryan124");
+  const [did, setDid] = useState("did:example:aryan123");
   const [docHash, setDocHash] = useState("QmDummyHash12345");
   const [pubKeys, setPubKeys] = useState("publicKey1,publicKey2");
   const [services, setServices] = useState("service1");
   const [status, setStatus] = useState("");
   const [total, setTotal] = useState("");
+  const [identityAddr, setIdentityAddr] = useState(null);
 
   const withEthers = async () => {
     const mod = await import("https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.min.js");
     return mod.ethers;
   };
 
-  const createDID = async () => {
+  // 🔹 Load contract address from backend
+  useEffect(() => {
+    (async () => {
+      try {
+        const a = await loadAddresses();
+        setIdentityAddr(a.IdentityRegistry);
+        console.log("✅ Loaded contract address:", a.IdentityRegistry);
+      } catch {
+        setStatus("❌ Failed to load contract addresses from backend");
+      }
+    })();
+  }, []);
+
+  const verifyDeployed = async (ethers, addr) => {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const code = await provider.getCode(addr);
+    if (!code || code === "0x") {
+      throw new Error(`No contract code at ${addr}. Redeploy or update contract-addresses.json.`);
+    }
+  };
+
+    const createDID = async () => {
     try {
-      setStatus("⏳ Sending transaction...");
-      const ethers = await withEthers();
-      const contract = new ethers.Contract(IDENTITY_REGISTRY, ABI, signer);
-
-      const didStr = did.trim();
-      const pkArray = pubKeys.split(",").map(s => s.trim()).filter(Boolean);
-      const svcArray = services.split(",").map(s => s.trim()).filter(Boolean);
-
-      // 1️⃣ Check if DID already exists
-      const exists = await contract.doesDIDExist(didStr);
-      if (exists) {
-        setStatus("❌ DID already exists! Try a different DID name.");
+      if (!identityAddr) {
+        setStatus("❌ Contract not loaded yet");
+        return;
+      }
+      if (identityAddr.toLowerCase() === "0x0000000000000000000000000000000000000000") {
+        setStatus("❌ Contract address is zero — update contract-addresses.json to the latest deploy");
+        return;
+      }
+      if (!account) {
+        setStatus("❌ Wallet not connected");
         return;
       }
 
-      // 2️⃣ Dry-run to detect reverts early
-      await contract.createDID.staticCall(didStr, docHash, pkArray, svcArray);
+      const ethers = await withEthers();
 
-      // 3️⃣ Send transaction (with manual gas limit)
-      const tx = await contract.createDID(
-        didStr,
-        docHash,
-        pkArray,
-        svcArray,
-        { gasLimit: 500_000 } // ✅ fixes low gas revert
-      );
+      // ✅ sanity check: ensure there is code at this address
+      await verifyDeployed(ethers, identityAddr);
 
+      const contract = new ethers.Contract(identityAddr, ABI, signer);
+
+      // ✅ safer precheck: only test the DID string existence (this ABI never fails)
+      // (we skip getDIDByAddress because your node returned decoding errors)
+      // If you want to check address ownership in UI, we’ll add it later via backend.
+      // For now, let the contract enforce it.
+      // const exists = await contract.doesDIDExist?.(did); // only if you add it to ABI
+      // if (exists) { setStatus(`⚠️ DID "${did}" already exists`); return; }
+
+      const pk = pubKeys.split(",").map(s => s.trim()).filter(Boolean);
+      const svc = services.split(",").map(s => s.trim()).filter(Boolean);
+
+      // ✅ dry-run first to get exact revert reason (e.g., "Address already has a DID")
+      setStatus("🔍 Simulating transaction (static call)...");
+      await contract.createDID.staticCall(did, docHash, pk, svc);
+
+      // ✅ then send the real transaction with a safe gas limit
+      setStatus("🚀 Sending transaction...");
+      const tx = await contract.createDID(did, docHash, pk, svc, { gasLimit: 500_000 });
       setStatus(`⏳ Pending: ${tx.hash}`);
       await tx.wait();
-      setStatus(`✅ Mined successfully! Tx: ${tx.hash}`);
 
-      // 4️⃣ Refresh total count
-      const v = await contract.getTotalDIDs();
-      setTotal(v.toString());
+      setStatus(`✅ Mined successfully: ${tx.hash}`);
     } catch (e) {
       console.error(e);
+      // Show a helpful reason if available
       const msg =
         e?.info?.error?.message ||
         e?.shortMessage ||
+        e?.reason ||
         e?.message ||
-        "Create DID failed";
+        "Transaction failed";
       setStatus(`❌ ${msg}`);
     }
   };
 
   const readTotal = async () => {
     try {
+      if (!identityAddr) {
+        setStatus("❌ Contract not loaded yet");
+        return;
+      }
       const ethers = await withEthers();
-      const contract = new ethers.Contract(IDENTITY_REGISTRY, ABI, signer);
+      const contract = new ethers.Contract(identityAddr, ABI, signer);
       const v = await contract.getTotalDIDs();
       setTotal(v.toString());
-      setStatus(`✅ Total DIDs fetched.`);
+      setStatus("");
     } catch (e) {
       console.error(e);
-      setStatus(`❌ ${e.message || "Failed to read total DIDs."}`);
+      setStatus(`❌ ${e.message || "Read failed"}`);
     }
   };
 
   return (
-    <div style={{
-      maxWidth: 720,
-      margin: "40px auto",
-      padding: 16,
-      border: "1px solid #e5e5e5",
-      borderRadius: 12
-    }}>
-      <h2>Identity Registry (local)</h2>
+    <div style={{ maxWidth: 720, margin: "40px auto", padding: 16, border: "1px solid #e5e5e5", borderRadius: 12 }}>
+      <h2>Identity Registry (Local Hardhat)</h2>
 
       {!ready ? (
         <>
           <p>Connect your wallet (MetaMask on <b>Hardhat Local</b> 31337).</p>
-          <button onClick={connect} style={{ padding: "10px 16px", borderRadius: 8 }}>
-            Connect Wallet
-          </button>
+          <button onClick={connect} style={{ padding: "10px 16px", borderRadius: 8 }}>Connect Wallet</button>
           {error && <p style={{ color: "crimson" }}>{error}</p>}
         </>
       ) : (
         <>
-          <p>Connected: <code>{account}</code></p>
+          <p><strong>Connected:</strong> <code>{account}</code></p>
+          <p><strong>Contract:</strong> <code>{identityAddr || "(loading...)"}</code></p>
 
           <div style={{ display: "grid", gap: 8 }}>
             <label>DID
@@ -145,10 +178,6 @@ export default function DIDPanel() {
 
           {status && <p style={{ marginTop: 12 }}>{status}</p>}
           {total !== "" && <p style={{ marginTop: 4 }}>Total DIDs: <b>{total}</b></p>}
-
-          <p style={{ marginTop: 16, color: "#555" }}>
-            Using contract: <code>{IDENTITY_REGISTRY}</code>
-          </p>
         </>
       )}
     </div>
