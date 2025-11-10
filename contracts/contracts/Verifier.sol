@@ -80,7 +80,7 @@ contract Verifier {
         // Simplified verification - in practice this would be the actual ZKP verification
         // For demo purposes, we'll accept proofs with certain characteristics
         
-        if (proof.length < 32) {
+        if (proof.length < 2) {
             return false;
         }
         

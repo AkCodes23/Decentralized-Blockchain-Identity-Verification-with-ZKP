@@ -3,6 +3,103 @@ import React, { useEffect, useState } from "react";
 import { ethers } from "ethers";
 import { loadAddresses } from "../lib/addresses";
 
+// ---- Keep ABI outside the component to avoid hook deps noise ----
+const ABI = [
+  // ---- Admin / issuer ----
+  {
+    inputs: [
+      { name: "issuerDID", type: "string" },
+      { name: "issuerName", type: "string" },
+      { name: "issuerType", type: "string" },
+    ],
+    name: "registerIssuer",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      { name: "issuerDID", type: "string" },
+      { name: "authorized", type: "bool" },
+    ],
+    name: "setIssuerAuthorization",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "issuerDID", type: "string" }],
+    name: "issuers",
+    outputs: [
+      { name: "did", type: "string" },
+      { name: "name", type: "string" },
+      { name: "issuerType", type: "string" },
+      { name: "isAuthorized", type: "bool" },
+      { name: "registeredAt", type: "uint256" },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+
+  // ---- Issue credential ----
+  {
+    inputs: [
+      { name: "credentialId", type: "string" },
+      { name: "holderDID", type: "string" },
+      { name: "credentialType", type: "string" },
+      { name: "credentialHash", type: "string" },
+      { name: "expiresAt", type: "uint256" },
+      { name: "attributes", type: "string[]" },
+      { name: "metadata", type: "string" },
+      { name: "issuerDID", type: "string" },
+    ],
+    name: "issueCredential",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
+
+  // ---- View ----
+  {
+    inputs: [{ name: "holderDID", type: "string" }],
+    name: "getCredentialsByHolder",
+    outputs: [{ type: "string[]" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "credentialId", type: "string" }],
+    name: "getCredential",
+    outputs: [
+      {
+        components: [
+          { name: "credentialId", type: "string" },
+          { name: "issuerDID", type: "string" },
+          { name: "holderDID", type: "string" },
+          { name: "credentialType", type: "string" },
+          { name: "credentialHash", type: "string" },
+          { name: "issuedAt", type: "uint256" },
+          { name: "expiresAt", type: "uint256" },
+          { name: "isRevoked", type: "bool" },
+          { name: "attributes", type: "string[]" },
+          { name: "metadata", type: "string" },
+        ],
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ name: "credentialId", type: "string" }],
+    name: "isCredentialValid",
+    outputs: [{ type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+];
+
 export default function CredentialManager({ account, provider, signer }) {
   const [credAddr, setCredAddr] = useState("");
   const [credContract, setCredContract] = useState(null);
@@ -32,104 +129,7 @@ export default function CredentialManager({ account, provider, signer }) {
   const [holderLookup, setHolderLookup] = useState("did:example:aryan123");
   const [holderCreds, setHolderCreds] = useState([]);
 
-  // ABI (only the functions we call)
-  const ABI = [
-    // ---- Admin / issuer ----
-    {
-      inputs: [
-        { name: "issuerDID", type: "string" },
-        { name: "issuerName", type: "string" },
-        { name: "issuerType", type: "string" },
-      ],
-      name: "registerIssuer",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function",
-    },
-    {
-      inputs: [
-        { name: "issuerDID", type: "string" },
-        { name: "authorized", type: "bool" },
-      ],
-      name: "setIssuerAuthorization",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function",
-    },
-    {
-      inputs: [{ name: "issuerDID", type: "string" }],
-      name: "issuers",
-      outputs: [
-        { name: "did", type: "string" },
-        { name: "name", type: "string" },
-        { name: "issuerType", type: "string" },
-        { name: "isAuthorized", type: "bool" },
-        { name: "registeredAt", type: "uint256" },
-      ],
-      stateMutability: "view",
-      type: "function",
-    },
-
-    // ---- Issue credential ----
-    {
-      inputs: [
-        { name: "credentialId", type: "string" },
-        { name: "holderDID", type: "string" },
-        { name: "credentialType", type: "string" },
-        { name: "credentialHash", type: "string" },
-        { name: "expiresAt", type: "uint256" },
-        { name: "attributes", type: "string[]" },
-        { name: "metadata", type: "string" },
-        { name: "issuerDID", type: "string" },
-      ],
-      name: "issueCredential",
-      outputs: [],
-      stateMutability: "nonpayable",
-      type: "function",
-    },
-
-    // ---- View ----
-    {
-      inputs: [{ name: "holderDID", type: "string" }],
-      name: "getCredentialsByHolder",
-      outputs: [{ type: "string[]" }],
-      stateMutability: "view",
-      type: "function",
-    },
-    {
-      inputs: [{ name: "credentialId", type: "string" }],
-      name: "getCredential",
-      outputs: [
-        {
-          components: [
-            { name: "credentialId", type: "string" },
-            { name: "issuerDID", type: "string" },
-            { name: "holderDID", type: "string" },
-            { name: "credentialType", type: "string" },
-            { name: "credentialHash", type: "string" },
-            { name: "issuedAt", type: "uint256" },
-            { name: "expiresAt", type: "uint256" },
-            { name: "isRevoked", type: "bool" },
-            { name: "attributes", type: "string[]" },
-            { name: "metadata", type: "string" },
-          ],
-          name: "",
-          type: "tuple",
-        },
-      ],
-      stateMutability: "view",
-      type: "function",
-    },
-    {
-      inputs: [{ name: "credentialId", type: "string" }],
-      name: "isCredentialValid",
-      outputs: [{ type: "bool" }],
-      stateMutability: "view",
-      type: "function",
-    },
-  ];
-
-  // 1) Load addresses once (from backend/public/src fallback)
+  // 1) Load addresses once
   useEffect(() => {
     (async () => {
       try {
@@ -142,7 +142,7 @@ export default function CredentialManager({ account, provider, signer }) {
     })();
   }, []);
 
-  // 2) Build contract only when BOTH signer and credAddr are ready
+  // 2) Build contract when signer + address ready
   useEffect(() => {
     if (!signer || !credAddr) return;
     try {
@@ -154,7 +154,7 @@ export default function CredentialManager({ account, provider, signer }) {
     }
   }, [signer, credAddr]);
 
-  // Reusable guard: verify code exists at address
+  // Guard: ensure code is deployed at address
   const requireDeployed = async () => {
     if (!credContract) throw new Error("Contract not ready");
     const onChainProvider = credContract.runner?.provider;
@@ -225,7 +225,7 @@ export default function CredentialManager({ account, provider, signer }) {
 
       const expires =
         credential.expiresAt && String(credential.expiresAt).trim() !== ""
-          ? BigInt(credential.expiresAt)
+          ? ethers.toBigInt(credential.expiresAt) // <-- no BigInt() global needed
           : 0n;
 
       const attrs = credential.attributes
@@ -244,7 +244,6 @@ export default function CredentialManager({ account, provider, signer }) {
       );
       await tx.wait();
       setStatusMsg("✅ Credential issued");
-      // Auto refresh the holder list with the same DID
       await loadHolderCredentials();
     } catch (err) {
       console.error(err);
@@ -263,7 +262,6 @@ export default function CredentialManager({ account, provider, signer }) {
 
       const ids = await credContract.getCredentialsByHolder(holderLookup);
 
-      // If no credentials yet, clear & exit gracefully
       if (!ids || ids.length === 0) {
         setHolderCreds([]);
         setStatusMsg("ℹ️ No credentials for this holder DID yet.");
@@ -298,13 +296,13 @@ export default function CredentialManager({ account, provider, signer }) {
     } catch (err) {
       console.error(err);
       setStatusMsg("❌ Failed to load credentials: " + (err.reason || err.message));
-      setHolderCreds([]); // ensure render doesn't try to decode empty
+      setHolderCreds([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // ---- UI ----
+  // ---- small UI helpers ----
   const field = (label, value, onChange, placeholder = "", type = "text") => (
     <label style={{ display: "grid", gap: 6 }}>
       <span style={{ fontWeight: 600 }}>{label}</span>
@@ -335,11 +333,7 @@ export default function CredentialManager({ account, provider, signer }) {
     >
       <div style={{ display: "flex", justifyContent: "space-between" }}>
         <h3 style={{ margin: 0 }}>{title}</h3>
-        {hint && (
-          <small style={{ opacity: 0.7 }}>
-            {hint}
-          </small>
-        )}
+        {hint && <small style={{ opacity: 0.7 }}>{hint}</small>}
       </div>
       <div style={{ display: "grid", gap: 12, marginTop: 10 }}>{children}</div>
     </div>
@@ -410,7 +404,7 @@ export default function CredentialManager({ account, provider, signer }) {
             Load Holder Credentials
           </button>
 
-          <div style={{ display: "grid", gap: 12 }}>
+          <div style={{ marginTop: 8, display: "grid", gap: 12 }}>
             {holderCreds.length === 0 ? (
               <p style={{ margin: 0, opacity: 0.8 }}>No credentials found.</p>
             ) : (
