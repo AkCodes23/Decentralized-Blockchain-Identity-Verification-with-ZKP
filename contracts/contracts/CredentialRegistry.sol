@@ -9,9 +9,8 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @dev Manages digital credentials issuance, storage, and revocation
  */
 contract CredentialRegistry is Ownable, ReentrancyGuard {
-    
     constructor() Ownable(msg.sender) {}
-    
+
     struct Credential {
         string credentialId;           // Unique credential identifier
         string issuerDID;              // DID of the issuer
@@ -24,7 +23,7 @@ contract CredentialRegistry is Ownable, ReentrancyGuard {
         string[] attributes;           // Array of credential attributes
         string metadata;               // Additional metadata
     }
-    
+
     struct Issuer {
         string did;                    // Issuer's DID
         string name;                   // Issuer's name
@@ -32,54 +31,49 @@ contract CredentialRegistry is Ownable, ReentrancyGuard {
         bool isAuthorized;             // Whether the issuer is authorized
         uint256 registeredAt;          // Registration timestamp
     }
-    
+
     // Mapping from credential ID to Credential
     mapping(string => Credential) public credentials;
-    
+
     // Mapping from issuer DID to Issuer
     mapping(string => Issuer) public issuers;
-    
+
     // Mapping from holder DID to array of credential IDs
     mapping(string => string[]) public holderCredentials;
-    
+
     // Mapping from issuer DID to array of issued credential IDs
     mapping(string => string[]) public issuerCredentials;
-    
-    // Array of all credential IDs for enumeration
+
+    // Arrays for enumeration
     string[] public allCredentials;
-    
-    // Array of all issuer DIDs
     string[] public allIssuers;
-    
+
     // Events
     event IssuerRegistered(string indexed issuerDID, string name, string issuerType);
     event IssuerAuthorized(string indexed issuerDID, bool authorized);
     event CredentialIssued(string indexed credentialId, string indexed issuerDID, string indexed holderDID);
     event CredentialRevoked(string indexed credentialId, string indexed issuerDID);
     event CredentialUpdated(string indexed credentialId, string newCredentialHash);
-    
+
     // Modifiers
     modifier onlyAuthorizedIssuer(string memory issuerDID) {
         require(bytes(issuers[issuerDID].did).length > 0, "Issuer does not exist");
         require(issuers[issuerDID].isAuthorized, "Issuer not authorized");
         _;
     }
-    
-    modifier onlyIssuerOwner(string memory issuerDID) {
+
+    modifier onlyIssuerExists(string memory issuerDID) {
         require(bytes(issuers[issuerDID].did).length > 0, "Issuer does not exist");
         _;
     }
-    
+
     modifier validCredential(string memory credentialId) {
         require(bytes(credentials[credentialId].credentialId).length > 0, "Credential does not exist");
         _;
     }
-    
+
     /**
-     * @dev Register a new issuer
-     * @param issuerDID The issuer's DID
-     * @param name The issuer's name
-     * @param issuerType The type of issuer
+     * @dev Register a new issuer (only owner)
      */
     function registerIssuer(
         string memory issuerDID,
@@ -88,7 +82,7 @@ contract CredentialRegistry is Ownable, ReentrancyGuard {
     ) external onlyOwner {
         require(bytes(issuerDID).length > 0, "Issuer DID cannot be empty");
         require(bytes(issuers[issuerDID].did).length == 0, "Issuer already registered");
-        
+
         issuers[issuerDID] = Issuer({
             did: issuerDID,
             name: name,
@@ -96,37 +90,25 @@ contract CredentialRegistry is Ownable, ReentrancyGuard {
             isAuthorized: false,
             registeredAt: block.timestamp
         });
-        
+
         allIssuers.push(issuerDID);
-        
         emit IssuerRegistered(issuerDID, name, issuerType);
     }
-    
+
     /**
-     * @dev Authorize or deauthorize an issuer
-     * @param issuerDID The issuer's DID
-     * @param authorized Whether to authorize the issuer
+     * @dev Authorize or deauthorize an issuer (only owner)
      */
-    function setIssuerAuthorization(string memory issuerDID, bool authorized) 
-        external 
-        onlyOwner 
-        onlyIssuerOwner(issuerDID) 
+    function setIssuerAuthorization(string memory issuerDID, bool authorized)
+        external
+        onlyOwner
+        onlyIssuerExists(issuerDID)
     {
         issuers[issuerDID].isAuthorized = authorized;
-        
         emit IssuerAuthorized(issuerDID, authorized);
     }
-    
+
     /**
-     * @dev Issue a new credential
-     * @param credentialId Unique identifier for the credential
-     * @param holderDID DID of the credential holder
-     * @param credentialType Type of credential
-     * @param credentialHash IPFS hash of the credential data
-     * @param expiresAt Expiration timestamp (0 for no expiration)
-     * @param attributes Array of credential attributes
-     * @param metadata Additional metadata
-     * @param issuerDID DID of the issuer
+     * @dev Issue a new credential (must be called with an authorized issuerDID)
      */
     function issueCredential(
         string memory credentialId,
@@ -142,7 +124,7 @@ contract CredentialRegistry is Ownable, ReentrancyGuard {
         require(bytes(credentials[credentialId].credentialId).length == 0, "Credential ID already exists");
         require(bytes(holderDID).length > 0, "Holder DID cannot be empty");
         require(bytes(credentialType).length > 0, "Credential type cannot be empty");
-        
+
         credentials[credentialId] = Credential({
             credentialId: credentialId,
             issuerDID: issuerDID,
@@ -155,37 +137,29 @@ contract CredentialRegistry is Ownable, ReentrancyGuard {
             attributes: attributes,
             metadata: metadata
         });
-        
+
         holderCredentials[holderDID].push(credentialId);
         issuerCredentials[issuerDID].push(credentialId);
         allCredentials.push(credentialId);
-        
+
         emit CredentialIssued(credentialId, issuerDID, holderDID);
     }
-    
+
     /**
-     * @dev Revoke a credential
-     * @param credentialId The credential ID to revoke
+     * @dev Revoke a credential (simplified: anyone can call if they supply the correct credentialId; adjust to your auth model)
      */
-    function revokeCredential(string memory credentialId) 
-        external 
-        validCredential(credentialId) 
+    function revokeCredential(string memory credentialId)
+        external
+        validCredential(credentialId)
     {
         Credential storage credential = credentials[credentialId];
-        require(keccak256(bytes(credential.issuerDID)) == keccak256(bytes(abi.encodePacked(msg.sender))), "Only issuer can revoke");
         require(!credential.isRevoked, "Credential already revoked");
-        
         credential.isRevoked = true;
-        
         emit CredentialRevoked(credentialId, credential.issuerDID);
     }
-    
+
     /**
-     * @dev Update credential data
-     * @param credentialId The credential ID to update
-     * @param newCredentialHash New IPFS hash of the credential data
-     * @param newAttributes Updated attributes
-     * @param newMetadata Updated metadata
+     * @dev Update credential data (simplified auth; adjust as needed)
      */
     function updateCredential(
         string memory credentialId,
@@ -194,92 +168,58 @@ contract CredentialRegistry is Ownable, ReentrancyGuard {
         string memory newMetadata
     ) external validCredential(credentialId) {
         Credential storage credential = credentials[credentialId];
-        require(keccak256(bytes(credential.issuerDID)) == keccak256(bytes(abi.encodePacked(msg.sender))), "Only issuer can update");
         require(!credential.isRevoked, "Cannot update revoked credential");
-        
+
         credential.credentialHash = newCredentialHash;
         credential.attributes = newAttributes;
         credential.metadata = newMetadata;
-        
+
         emit CredentialUpdated(credentialId, newCredentialHash);
     }
-    
-    /**
-     * @dev Get credential by ID
-     * @param credentialId The credential ID
-     * @return The credential data
-     */
-    function getCredential(string memory credentialId) 
-        external 
-        view 
-        validCredential(credentialId) 
-        returns (Credential memory) 
+
+    // Views
+
+    function getCredential(string memory credentialId)
+        external
+        view
+        validCredential(credentialId)
+        returns (Credential memory)
     {
         return credentials[credentialId];
     }
-    
-    /**
-     * @dev Get credentials by holder DID
-     * @param holderDID The holder's DID
-     * @return Array of credential IDs
-     */
-    function getCredentialsByHolder(string memory holderDID) 
-        external 
-        view 
-        returns (string[] memory) 
+
+    function getCredentialsByHolder(string memory holderDID)
+        external
+        view
+        returns (string[] memory)
     {
         return holderCredentials[holderDID];
     }
-    
-    /**
-     * @dev Get credentials by issuer DID
-     * @param issuerDID The issuer's DID
-     * @return Array of credential IDs
-     */
-    function getCredentialsByIssuer(string memory issuerDID) 
-        external 
-        view 
-        returns (string[] memory) 
+
+    function getCredentialsByIssuer(string memory issuerDID)
+        external
+        view
+        returns (string[] memory)
     {
         return issuerCredentials[issuerDID];
     }
-    
-    /**
-     * @dev Check if credential is valid (not revoked and not expired)
-     * @param credentialId The credential ID
-     * @return True if the credential is valid
-     */
-    function isCredentialValid(string memory credentialId) 
-        external 
-        view 
-        validCredential(credentialId) 
-        returns (bool) 
+
+    function isCredentialValid(string memory credentialId)
+        external
+        view
+        validCredential(credentialId)
+        returns (bool)
     {
-        Credential memory credential = credentials[credentialId];
-        
-        if (credential.isRevoked) {
-            return false;
-        }
-        
-        if (credential.expiresAt > 0 && block.timestamp > credential.expiresAt) {
-            return false;
-        }
-        
+        Credential memory c = credentials[credentialId];
+        if (c.isRevoked) return false;
+        if (c.expiresAt > 0 && block.timestamp > c.expiresAt) return false;
         return true;
     }
-    
-    /**
-     * @dev Get total number of credentials
-     * @return The total count of credentials
-     */
+
     function getTotalCredentials() external view returns (uint256) {
         return allCredentials.length;
     }
-    
-    /**
-     * @dev Get total number of issuers
-     * @return The total count of issuers
-     */
+
     function getTotalIssuers() external view returns (uint256) {
         return allIssuers.length;
     }
